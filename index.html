@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NeXus — Intelligent Network Orchestration</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Noto+Naskh+Arabic&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#030509;--txt:#d9f4ff;--dim:#4d7a94;--acc:#00e5ff;--gold:#ffc400;--red:#ff2d55;--grn:#00ff9d;--purple:#c05fff;--blue:#4d9fff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:14px/1.5 'Rajdhani',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse at 15% 20%,rgba(0,229,255,.09),transparent 50%),radial-gradient(ellipse at 85% 80%,rgba(255,196,0,.05),transparent 50%)}
+#map{position:absolute;inset:0;z-index:1}
+.leaflet-container{background:var(--bg)!important}
+.leaflet-control-attribution{background:rgba(3,5,9,.85)!important;color:var(--dim)!important;font-size:9px!important}
+/* KEY-FREE OSM tiles, darkened to match the command-deck theme */
+.dark-tiles{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.35)}
+.gc{position:relative;border-radius:14px;overflow:hidden;cursor:pointer;background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02));-webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.10);clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));transition:transform .25s,box-shadow .25s,border-color .25s}
+.gc::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.08) 45%,transparent 60%);transform:translateX(-120%);transition:transform .7s}
+.gc:hover{transform:translateY(-3px);border-color:var(--kc,var(--acc));box-shadow:0 10px 34px rgba(0,0,0,.5),0 0 22px var(--kc,var(--acc))}
+.gc:hover::before{transform:translateX(120%)}
+.gc::after{content:'';position:absolute;left:0;top:0;width:3px;height:100%;background:var(--kc,var(--acc));box-shadow:0 0 12px var(--kc,var(--acc))}
+.gc .body{padding:12px 14px}
+.gc .meta{display:flex;justify-content:space-between;font-size:9px;color:var(--dim);font-family:'Share Tech Mono',monospace;margin-bottom:5px}
+.gc .content{font-size:12px;line-height:1.5;word-break:break-word}
+.gc .content b{color:var(--kc,var(--acc))}
+.gc .thought{color:var(--dim);font-size:11px;font-style:italic;display:block;margin-top:4px}
+.gc .detail{display:none;margin-top:8px;border-top:1px dashed rgba(255,255,255,.12);padding-top:8px;font-size:11px;color:var(--dim)}
+.gc.open .detail{display:block}
+.ar{direction:rtl;text-align:right;font-family:'Noto Naskh Arabic',serif;font-size:13px;color:var(--dim);margin-top:6px}
+.k-predict{--kc:var(--gold)}.k-sense{--kc:var(--acc)}.k-locate{--kc:var(--blue)}.k-security{--kc:var(--grn)}.k-act{--kc:var(--gold)}.k-guarantee{--kc:var(--grn)}.k-detection{--kc:var(--red)}.k-receipt{--kc:var(--grn)}.k-agent{--kc:var(--purple)}.k-network{--kc:var(--acc)}.k-err{--kc:var(--red)}.k-op{--kc:var(--gold)}
+.topbar{position:relative;z-index:30;height:64px;display:flex;align-items:center;gap:14px;padding:0 16px;background:rgba(3,5,9,.92);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-bottom:1px solid rgba(0,229,255,.16)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .logo{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:conic-gradient(from 0deg,var(--acc),var(--gold),var(--acc));animation:spin 8s linear infinite}
+.brand .logo span{width:26px;height:26px;border-radius:7px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:15px;animation:spin 8s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.brand h1{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;letter-spacing:4px;color:var(--acc);background:linear-gradient(90deg,var(--acc),var(--gold),var(--acc));background-size:200%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:grad 3s ease infinite}
+@keyframes grad{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid rgba(0,229,255,.16);border-radius:9px;background:rgba(0,229,255,.04);font-family:'Orbitron',sans-serif;font-size:11px}
+.chip b{color:var(--acc);text-shadow:0 0 10px var(--acc)}
+#mode-badge{padding:6px 12px;border-radius:9px;font-family:'Orbitron',sans-serif;font-weight:900;font-size:10px;letter-spacing:1px}
+#mode-badge.LIVE{background:rgba(0,255,157,.15);color:var(--grn);border:1px solid var(--grn)}
+#mode-badge.TWIN{background:rgba(255,196,0,.15);color:var(--gold);border:1px solid var(--gold)}
+#mode-badge.CONNECTING{background:rgba(77,159,255,.15);color:var(--blue);border:1px solid var(--blue)}
+#mode-badge.OFFLINE{background:rgba(255,45,85,.15);color:var(--red);border:1px solid var(--red)}
+.gauge{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:9px;font-weight:900;color:var(--grn);background:conic-gradient(var(--grn) var(--p,0%),rgba(255,255,255,.08) 0);position:relative}
+.gauge::after{content:'';position:absolute;inset:5px;border-radius:50%;background:var(--bg)}
+.gauge span{position:relative;z-index:1}
+.rail{position:absolute;left:12px;top:80px;z-index:25;display:flex;flex-direction:column;gap:8px}
+.rail button{width:46px;height:46px;border-radius:12px;border:1px solid rgba(0,229,255,.16);background:rgba(3,5,9,.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);color:var(--dim);font-size:18px;cursor:pointer;transition:all .2s}
+.rail button.on{color:var(--acc);border-color:var(--acc);box-shadow:0 0 18px rgba(0,229,255,.3)}
+.panel{position:absolute;right:12px;top:80px;bottom:64px;width:430px;z-index:25;display:flex;flex-direction:column;background:rgba(3,5,9,.9);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:1px solid rgba(0,229,255,.16);border-radius:16px;overflow:hidden}
+.panel .head{padding:12px 14px;border-bottom:1px solid rgba(0,229,255,.16);font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:2px;color:var(--acc)}
+.panel .scroll{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px}
+.panel .scroll::-webkit-scrollbar{width:6px}
+.panel .scroll::-webkit-scrollbar-thumb{background:rgba(0,229,255,.2);border-radius:3px}
+.ticker{position:absolute;left:0;right:0;bottom:0;height:44px;z-index:26;display:flex;align-items:center;gap:12px;padding:0 16px;background:rgba(3,5,9,.92);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-top:1px solid rgba(0,229,255,.16);overflow:hidden}
+.ticker .stream{white-space:nowrap;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim)}
+.holo{position:absolute;left:70px;right:450px;top:80px;bottom:64px;z-index:24;display:none;flex-direction:column;gap:10px;overflow-y:auto;padding:4px}
+.holo.active{display:flex}
+.holo .gc{cursor:default}
+.steps{display:flex;flex-direction:column;gap:6px}
+.snode{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);font-family:'Share Tech Mono',monospace;font-size:11px}
+.snode .dot{width:9px;height:9px;border-radius:50%;background:var(--dim)}
+.snode.calling{border-color:var(--gold)}.snode.calling .dot{background:var(--gold);animation:pulse 1s infinite}
+.snode.complete{border-color:var(--grn)}.snode.complete .dot{background:var(--grn)}
+.snode.degraded{border-color:var(--red)}.snode.degraded .dot{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.snode .ph{font-weight:900;color:var(--acc);min-width:76px}
+.snode .api{color:var(--gold)}
+.snode .sum{color:var(--dim);flex:1}
+.dossier-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.dossier-grid>div{display:flex;flex-direction:column}
+.dl{font-size:8px;color:var(--dim);letter-spacing:1px;font-family:'Share Tech Mono',monospace}
+.dv{font-size:11px;font-weight:600}
+.dv.bad{color:var(--red)}.dv.good{color:var(--grn)}
+.rline{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.08);font-family:'Share Tech Mono',monospace;font-size:10px}
+.rline .st{padding:1px 6px;border-radius:4px;font-size:9px}
+.rline .st.complete{background:rgba(0,255,157,.15);color:var(--grn)}
+.rline .st.degraded{background:rgba(255,45,85,.15);color:var(--red)}
+.rline .st.calling{background:rgba(255,196,0,.15);color:var(--gold)}
+.badge{display:inline-block;font-size:8px;font-weight:900;padding:2px 7px;border-radius:5px;text-transform:uppercase;font-family:'Orbitron',sans-serif}
+.badge.CRITICAL{background:rgba(255,45,85,.18);color:var(--red);border:1px solid var(--red)}
+.badge.HIGH{background:rgba(255,196,0,.18);color:var(--gold);border:1px solid var(--gold)}
+.badge.MEDIUM{background:rgba(0,229,255,.18);color:var(--acc);border:1px solid var(--acc)}
+.badge.LOW{background:rgba(77,122,148,.18);color:var(--dim);border:1px solid var(--dim)}
+.cmd{position:absolute;right:12px;bottom:52px;width:430px;z-index:26;display:flex;gap:8px}
+.cmd input{flex:1;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);border-radius:10px;padding:11px 14px;color:var(--txt);font-family:'Share Tech Mono',monospace;font-size:12px;outline:none}
+.cmd button{background:linear-gradient(135deg,var(--acc),var(--gold));color:#000;border:none;border-radius:10px;padding:11px 16px;font-family:'Orbitron',sans-serif;font-weight:900;font-size:10px;cursor:pointer}
+.demo-btn{margin-left:auto;background:linear-gradient(135deg,var(--gold),var(--red));color:#000;border:none;border-radius:9px;padding:8px 14px;font-family:'Orbitron',sans-serif;font-weight:900;font-size:10px;cursor:pointer}
+.modal{position:fixed;inset:0;background:rgba(3,5,9,.7);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);z-index:100;display:none;align-items:center;justify-content:center}
+.modal.active{display:flex}
+.modal .inner{width:420px;padding:20px;display:flex;flex-direction:column;gap:10px}
+.modal input,.modal select{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);border-radius:9px;padding:10px 12px;color:var(--txt);font-family:'Share Tech Mono',monospace;font-size:12px;outline:none}
+.modal h3{font-family:'Orbitron',sans-serif;color:var(--gold);letter-spacing:2px;font-size:13px;text-align:center}
+.modal .run{background:linear-gradient(135deg,var(--acc),var(--gold));color:#000;border:none;border-radius:9px;padding:12px;font-family:'Orbitron',sans-serif;font-weight:900;cursor:pointer}
+.empty{color:var(--dim);text-align:center;padding:16px;font-size:12px}
+@media(max-width:900px){.panel{width:calc(100% - 24px);right:12px}.holo{right:12px;top:auto;height:45%;bottom:100px}.cmd{width:calc(100% - 24px)}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand"><div class="logo"><span>🛰️</span></div><div><h1>NeXus</h1></div></div>
+  <span id="mode-badge" class="CONNECTING">CONNECTING</span>
+  <div class="chip">🕐 <span id="clock">--:--:--</span></div>
+  <div class="chip">💰 <b id="s-credits">0</b><span id="s-cur" style="font-size:9px;color:var(--dim)">USD</span></div>
+  <div class="chip">🫀 <b id="s-health">—</b></div>
+  <div class="chip">🤖 <b id="s-agents">0</b></div>
+  <div class="chip">🚨 <b id="s-det">0</b></div>
+  <div class="gauge" id="sla" title="Live CAMARA API success rate"><span id="sla-t">—</span></div>
+  <button class="demo-btn" onclick="openDemo()">▶ RUN SCENARIO</button>
+</div>
+<div id="map"></div>
+<div class="rail">
+  <button class="on" data-p="fusion" title="Fusion / Priority">🚨</button>
+  <button data-p="live" title="Live reasoning">🧠</button>
+  <button data-p="orch" title="Orchestration log">🎛️</button>
+  <button data-p="blue" title="Blueprints">🗺️</button>
+  <button data-p="trust" title="Trust">🛡️</button>
+  <button data-p="via" title="Viability">📈</button>
+</div>
+<div class="holo" id="holo"></div>
+<div class="panel"><div class="head" id="panel-head">FUSION / PRIORITY</div><div class="scroll" id="feed"></div></div>
+<div class="cmd"><input id="cmd" placeholder="Direct NeXus (natural language, any language)…"><button onclick="send()">EXECUTE</button></div>
+<div class="ticker"><span class="stream" id="ticker">NeXus agentic brain online · MENA-bounded viewport · PREDICT → ACT → GUARANTEE · 6-CAMARA-API orchestration · grounding enforced · zero-trust ·</span></div>
+<div class="modal" id="demo-modal"><div class="inner gc"><h3>RUNTIME SCENARIO (nothing preset)</h3>
+  <input id="d-region" placeholder="Region / city (free text) — required">
+  <input id="d-asset" placeholder="Asset type (free text)">
+  <select id="d-fault"><option value="none">No fault</option><option value="connectivity">Inject: connectivity loss</option><option value="location">Inject: location unavailable</option></select>
+  <input id="d-msisdn" placeholder="MSISDN (optional; blank = sandbox/synthetic)">
+  <button class="run" onclick="runDemo()">▶ RUN</button>
+  <button class="run" style="background:transparent;color:var(--dim);border:1px solid var(--dim)" onclick="closeDemo()">cancel</button>
+</div></div>
+<script>
+var H={'Content-Type':'application/json'};
+var sock=null,markers={},orch=null,panel='fusion',tickerBuf=[];
+function $(id){return document.getElementById(id);}
+function esc(x){return String(x==null?'':x).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function S(id,v){var e=$(id);if(e)e.textContent=v;}
+function tick(m){tickerBuf.push(m);if(tickerBuf.length>12)tickerBuf.shift();S('ticker',tickerBuf.join(' · ')+' ·');}
+/* ===== MENA-BOUNDED, KEY-FREE MAP ===== */
+var MENA_BOUNDS=L.latLngBounds(L.latLng(12,-18),L.latLng(42,63));
+var MENA_PAD=MENA_BOUNDS.pad(0.15);
+var map=L.map('map',{minZoom:3,maxZoom:18,zoomControl:false,worldCopyJump:false,maxBounds:MENA_PAD,maxBoundsViscosity:0.9}).setView([26,45],4);
+var osmTiles=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',subdomains:'abc',maxZoom:19,className:'dark-tiles'});
+osmTiles.on('tileerror',function once(){
+  osmTiles.off('tileerror',once);
+  try{map.removeLayer(osmTiles);}catch(e){}
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{attribution:'© Esri, TomTom',maxZoom:18}).addTo(map);
+});
+osmTiles.addTo(map);
+var clamping=false;
+map.on('moveend',function(){
+  if(clamping)return;
+  if(!MENA_PAD.contains(map.getCenter())){
+    clamping=true;
+    map.panInsideBounds(MENA_BOUNDS,{animate:false});
+    setTimeout(function(){clamping=false;},80);
+  }
+});
+setTimeout(function(){try{map.invalidateSize();}catch(e){}},150);
+window.addEventListener('resize',function(){try{map.invalidateSize();}catch(e){}});
+setInterval(function(){S('clock',new Date().toUTCString().slice(17,25)+' UTC');},1000);
+var MAX_MARKERS=100;
+function inMENA(lat,lon){return MENA_BOUNDS.contains(L.latLng(lat,lon));}
+function marker(lat,lon,label,color,fly){
+  lat=+lat;lon=+lon;
+  if(!isFinite(lat)||!isFinite(lon))return;
+  if(!markers[label]&&Object.keys(markers).length>=MAX_MARKERS){var k=Object.keys(markers)[0];try{map.removeLayer(markers[k]);}catch(e){}delete markers[k];}
+  if(markers[label]){markers[label].setLatLng([lat,lon]);}
+  else{markers[label]=L.circleMarker([lat,lon],{radius:9,color:color,fillColor:color,fillOpacity:.85,weight:2}).addTo(map).bindTooltip(label);}
+  if(fly){
+    if(inMENA(lat,lon)){try{map.flyTo([lat,lon],Math.max(map.getZoom(),6),{animate:true,duration:1.2});}catch(e){}}
+    else{tick('event outside MENA viewport — not tracked on map');}
+  }
+}
+function connect(){
+  var proto=location.protocol==='https:'?'wss':'ws';
+  sock=new WebSocket(proto+'://'+location.host+'/ws');
+  sock.onopen=function(){try{sock.send(JSON.stringify({type:'ping'}));}catch(e){}};
+  sock.onmessage=function(ev){var d=null;try{d=JSON.parse(ev.data);}catch(e){return;}handle(d);};
+  sock.onclose=function(){setTimeout(connect,2500);};
+  sock.onerror=function(){try{sock.close();}catch(e){}};
+}
+connect();
+function card(html,cls,expandable){
+  var d=document.createElement('div');
+  d.className='gc'+(cls?' '+cls:'');
+  d.innerHTML='<div class="body">'+html+'</div>';
+  if(expandable!==false){d.addEventListener('click',function(){d.classList.toggle('open');});}
+  return d;
+}
+function push(html,cls){
+  if(panel!=='live'&&panel!=='orch')return;
+  var f=$('feed');if(!f)return;
+  f.prepend(card(html,cls));
+  while(f.children.length>80){f.removeChild(f.lastChild);}
+}
+var PANEL_HEADS={fusion:'FUSION / PRIORITY',live:'LIVE REASONING',orch:'ORCHESTRATION LOG',blue:'REGIONAL BLUEPRINTS',trust:'TRUST / ZERO-TRUST',via:'VIABILITY'};
+function setPanel(p){
+  panel=p;
+  document.querySelectorAll('.rail button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-p')===p);});
+  S('panel-head',PANEL_HEADS[p]||'');
+  var f=$('feed');if(!f)return;f.innerHTML='';
+  if(p==='fusion')loadPriority();
+  else if(p==='blue')loadBlueprints();
+  else if(p==='trust')loadTrust();
+  else if(p==='via')loadVia();
+  else f.innerHTML='<div class="empty">'+(p==='live'?'Live reasoning streams here…':'Run a scenario — the Holo-Player (center) and this log populate in real time.')+'</div>';
+}
+document.querySelectorAll('.rail button').forEach(function(b){b.addEventListener('click',function(){setPanel(b.getAttribute('data-p'));});});
+async function loadPriority(){
+  var f=$('feed');if(!f)return;
+  try{
+    var j=await (await fetch('/api/priority')).json();
+    f.innerHTML='';
+    var b=j.board||[];
+    if(!b.length){f.innerHTML='<div class="empty">No active detections. Scanner watching…</div>';return;}
+    b.forEach(function(d){
+      f.appendChild(card('<div class="meta"><span class="badge '+esc(d.severity)+'">'+esc(d.severity)+'</span><span>'+esc(d.minutes_ago)+'m · P'+esc(d.priority)+'</span></div><div class="content"><b>'+esc(d.title)+'</b><span class="thought">'+esc(d.summary||'')+'</span></div>','k-detection'));
+    });
+  }catch(e){f.innerHTML='<div class="empty">Could not load board.</div>';}
+}
+async function loadBlueprints(){
+  var f=$('feed');if(!f)return;
+  try{
+    var j=await (await fetch('/api/blueprints')).json();
+    f.innerHTML='';
+    var list=j.blueprints||[];
+    if(!list.length)f.innerHTML='<div class="empty">No blueprints yet — generate one.</div>';
+    list.forEach(function(b){
+      f.appendChild(card('<div class="meta"><span>'+esc(b.theme||'')+'</span><span>'+esc(b.currency||'')+'</span></div><div class="content"><b>'+esc(b.region)+'</b> — '+esc(b.metric||'')+'<span class="thought">'+esc(b.description||'')+'</span></div>','k-network'));
+    });
+    var wrap=document.createElement('div');
+    wrap.innerHTML='<button class="run" style="width:100%" id="genblue">＋ GENERATE BLUEPRINT (runtime)</button>';
+    f.appendChild(wrap);
+    var gb=$('genblue');if(gb)gb.addEventListener('click',genBlue);
+  }catch(e){f.innerHTML='<div class="empty">Could not load blueprints.</div>';}
+}
+async function genBlue(){
+  var r=prompt('Region to author a blueprint for:');
+  if(!r)return;
+  try{await fetch('/api/blueprint',{method:'POST',headers:H,body:JSON.stringify({region:r})});}catch(e){}
+}
+async function loadTrust(){
+  var f=$('feed');if(!f)return;
+  try{
+    var j=await (await fetch('/api/security/posture')).json();
+    f.innerHTML='';
+    var pillars=j.pillars||{};
+    Object.keys(pillars).forEach(function(k){
+      f.appendChild(card('<div class="meta"><span>'+esc(k.toUpperCase())+'</span><span>🛡️</span></div><div class="content"><b>'+esc(pillars[k])+'</b></div>','k-security'));
+    });
+    var comp=(j.compliance||[]).map(function(c){return '<span class="badge MEDIUM">'+esc(c)+'</span>';}).join(' ');
+    f.appendChild(card('<div class="meta"><span>COMPLIANCE</span></div><div class="content">'+comp+'<span class="thought">consents: '+esc(j.consents)+' · ledger: '+esc(String(j.ledger_head||'').slice(0,18))+'…</span></div>','k-receipt'));
+  }catch(e){f.innerHTML='<div class="empty">Could not load trust posture.</div>';}
+}
+async function loadVia(){
+  var f=$('feed');if(!f)return;
+  try{
+    var j=await (await fetch('/api/viability')).json();
+    f.innerHTML='';
+    f.appendChild(card('<div class="meta"><span>B2G</span><span>B2B</span></div><div class="content"><b>'+esc((j.b2g||{}).city_licensing)+'</b> · <b>'+esc((j.b2b||{}).micro_transaction)+'</b><span class="thought">breakeven '+esc(j.breakeven)+' · margin '+esc(j.saas_margin)+' · Y3 '+esc(j.year3_target)+'</span><span class="thought">figures are labeled business assumptions; counts below are live</span></div>','k-network'));
+    f.appendChild(card('<div class="meta"><span>LIVE</span></div><div class="content">transactions <b>'+esc(j.transactions_to_date)+'</b> · revenue-to-date <b>'+esc(j.revenue_to_date)+'</b></div>','k-act'));
+  }catch(e){f.innerHTML='<div class="empty">Could not load viability.</div>';}
+}
+function openDemo(){$('demo-modal').classList.add('active');}
+function closeDemo(){$('demo-modal').classList.remove('active');}
+function runDemo(){
+  var rIn=$('d-region');
+  var region=((rIn&&rIn.value)||'').trim();
+  if(!region){if(rIn){rIn.style.borderColor='var(--red)';rIn.focus();}return;}
+  if(rIn)rIn.style.borderColor='';
+  var p={region:region,asset_type:(($('d-asset')&&$('d-asset').value)||'').trim(),fault:(($('d-fault')&&$('d-fault').value)||'none'),msisdn:(($('d-msisdn')&&$('d-msisdn').value)||'').trim()};
+  closeDemo();
+  fetch('/api/demo',{method:'POST',headers:H,body:JSON.stringify(p)}).catch(function(){});
+  setPanel('orch');
+}
+function send(){
+  var inp=$('cmd');if(!inp)return;
+  var v=inp.value.trim();if(!v)return;
+  inp.value='';
+  fetch('/webhook/command',{method:'POST',headers:H,body:JSON.stringify({command:v})}).catch(function(){});
+  setPanel('live');
+}
+var cmdEl=$('cmd');if(cmdEl)cmdEl.addEventListener('keydown',function(e){if(e.key==='Enter')send();});
+function stepNodes(steps){
+  return (steps||[]).map(function(s){
+    return '<div class="snode '+esc(s.status)+'"><span class="dot"></span><span class="ph">'+esc(s.phase)+'</span><span class="api">'+esc(s.api)+'</span><span class="sum">'+esc(s.summary)+'</span>'+(s.is_fault?'<span class="badge CRITICAL">FAULT</span>':'')+'</div>';
+  }).join('');
+}
+function dossierHtml(a){
+  if(!a)return '';
+  function bad(v){v=String(v||'');return v.indexOf('LOST')>=0||v.indexOf('UNAVAILABLE')>=0||v.indexOf('COMPROMISED')>=0;}
+  function cell(l,v,cls){return '<div><span class="dl">'+l+'</span><span class="dv '+(cls||'')+'">'+esc(v)+'</span></div>';}
+  return '<div class="gc k-network"><div class="body"><div class="meta"><span>ASSET DOSSIER</span><span>'+esc(a.status)+'</span></div><div class="dossier-grid">'
+   +cell('ID',a.asset_id)+cell('TYPE',a.asset_type)+cell('MSISDN',a.msisdn)+cell('CRIT',a.criticality)
+   +cell('CONN',a.connectivity,bad(a.connectivity)?'bad':'')+cell('SIM',a.sim_integrity,bad(a.sim_integrity)?'bad':'good')
+   +cell('LOC',a.last_location,bad(a.last_location)?'bad':'')+cell('QoD',(a.qod_sessions||[]).length,'good')
+   +'</div></div></div>';
+}
+function receiptHtml(o){
+  if(!o.receipt)return '';
+  var lines=(o.items||[]).map(function(it){
+    return '<div class="rline"><span class="ph">'+esc(it.phase)+'</span><span class="api">'+esc(it.api)+'</span><span class="st '+esc(it.status)+'">'+esc(it.status)+'</span><span style="color:var(--dim);flex:1">'+esc(it.fact_id||'—')+'</span></div>';
+  }).join('');
+  var pts=(o.points||[]).map(function(p){return '<li>'+esc(p)+'</li>';}).join('');
+  return '<div class="gc k-receipt"><div class="body"><div class="meta"><span>🧾 TRUST RECEIPT</span><span>'+(o.receipt.verified?'✅ VERIFIED':'⚠️ CHECK')+'</span></div><div class="steps">'+(lines||'<div class="empty">no lines</div>')+'</div>'
+   +(pts?'<ul style="margin:6px 0 0 16px;font-size:11px;color:var(--dim)">'+pts+'</ul>':'')
+   +'<div style="font-family:\'Share Tech Mono\',monospace;font-size:9px;color:var(--grn);word-break:break-all;margin-top:6px">hash: '+esc(o.receipt.ledger_hash||'')+'</div></div></div>';
+}
+function renderHolo(){
+  var h=$('holo');if(!h)return;
+  if(!orch){h.classList.remove('active');h.innerHTML='';return;}
+  h.classList.add('active');
+  var o=orch;
+  var head='<div class="gc k-predict"><div class="body"><div class="meta"><span>'+esc(o.title)+'</span><span>'+esc(o.subtitle||'')+'</span></div><div class="content">'+esc(o.narrative||'')+(o.narrative_ar?'<div class="ar">'+esc(o.narrative_ar)+'</div>':'')+'</div></div></div>';
+  var dec=o.decision?('<div class="gc k-act"><div class="body"><div class="meta"><span>AGENT DECISION</span><span>rule trigger: '+esc(String(o.rule&&o.rule.trigger))+'</span></div><div class="content">QoS <b>'+esc(o.decision.qos_profile||'—')+'</b> · '+esc(o.decision.duration||0)+'s'+(o.decision.use_geofence?' + geofence':'')+'<span class="thought">'+esc(o.decision.missing_data_handling||'')+'</span><span class="thought">'+esc(o.decision.reasoning||'')+'</span></div></div></div>'):'';
+  var res=o.resilience?('<div class="gc k-guarantee"><div class="body"><div class="content">🛡 <b>RESILIENCE</b> — '+esc(o.resilience)+'</div></div></div>'):'';
+  h.innerHTML=head+dossierHtml(o.asset)+'<div class="gc k-sense"><div class="body"><div class="meta"><span>ORCHESTRATION STEPS</span></div><div class="steps">'+(stepNodes(o.steps)||'<div class="empty">awaiting steps…</div>')+'</div></div></div>'+dec+receiptHtml(o)+res;
+}
+function handle(d){
+  if(!d||!d.type)return;
+  switch(d.type){
+    case 'network_mode':{var b=$('mode-badge');if(b){b.textContent=d.mode;b.className=d.mode;}tick('network: '+d.mode+' — '+(d.reason||''));break;}
+    case 'network_discovery':tick('endpoint: '+(d.resolved||d.entry));break;
+    case 'metrics':{var x=d.data||{};
+      S('s-credits',x.credits==null?'0':x.credits);S('s-cur',x.currency||'USD');
+      S('s-health',x.health==null?'—':x.health);S('s-agents',x.agents==null?'0':x.agents);S('s-det',x.active_detections==null?'0':x.active_detections);
+      var g=$('sla'),t=$('sla-t'),a=x.availability;
+      if(g){g.style.setProperty('--p',(a==null?0:a)+'%');}
+      if(t){t.textContent=(a==null?'—':a+'%');}
+      break;}
+    case 'scenario_start':{orch={title:d.situation.title,subtitle:d.situation.subtitle,narrative:d.situation.narrative,narrative_ar:d.situation.narrative_ar||'',steps:[],asset:null,decision:null,rule:null,receipt:null,resilience:'',items:[],points:[]};
+      renderHolo();marker(d.situation.lat,d.situation.lon,d.situation.asset_id,'#ffc400',true);
+      push('<div class="content">🎬 <b>'+esc(d.situation.title)+'</b> started<span class="thought">'+esc(d.situation.subtitle||'')+'</span></div>','k-predict');break;}
+    case 'scenario_step':{if(orch){orch.steps.push(d);orch.items=orch.steps.filter(function(s){return s.status!=='calling';});renderHolo();}
+      push('<div class="content">'+esc(d.phase)+' → '+esc(d.api)+' · '+esc(d.status)+'<span class="thought">'+esc(d.summary||'')+'</span></div>',d.status==='degraded'?'k-err':'k-sense');break;}
+    case 'asset_update':{if(orch){orch.asset=d.asset;renderHolo();}break;}
+    case 'scenario_decision':{if(orch){orch.decision=d.decision;orch.rule=d.rule;renderHolo();}break;}
+    case 'scenario_complete':{if(orch){orch.receipt=d.receipt;orch.resilience=d.resilience_note;orch.items=d.items||orch.items;orch.points=d.decision_points||[];renderHolo();}
+      push('<div class="content">🏁 <b>'+esc(d.situation_title)+'</b> complete<span class="thought">'+esc(d.resilience_note||'')+'</span></div>','k-guarantee');break;}
+    case 'detection_registered':
+    case 'detection_updated':{if(panel==='fusion')loadPriority();
+      push('<div class="meta"><span class="badge '+esc(d.detection.severity)+'">'+esc(d.detection.severity)+'</span><span>'+esc(d.detection.minutes_ago)+'m</span></div><div class="content"><b>'+esc(d.detection.title)+'</b></div>','k-detection');
+      marker(d.detection.lat,d.detection.lon,d.detection.id,'#ff2d55',true);break;}
+    case 'priority_board':{if(panel==='fusion')loadPriority();break;}
+    case 'device_probe':{var sem=d.semantic||{};push('<div class="content">📡 probe '+esc(d.msisdn)+' → <b>'+esc(sem.semantic)+'</b><span class="thought">'+esc(sem.meaning||'')+'</span></div>','k-network');break;}
+    case 'investigation_complete':{push('<div class="content">🔍 <b>'+esc(d.detection.title)+'</b><span class="thought">'+esc((d.assessment||{}).assessment||'')+'</span></div>','k-agent');break;}
+    case 'thinking':{tick(d.agent+': '+d.thought);push('<div class="content"><b>'+esc(d.agent)+'</b><span class="thought">'+esc(d.thought)+'</span></div>','k-agent');break;}
+    case 'token':{if(panel!=='live')break;var f=$('feed');if(!f)break;
+      var el=$('tok-'+d.agent);
+      if(!el){el=card('<div class="content"><b>'+esc(d.agent)+'</b> <span class="tk"></span></div>','k-agent',false);el.id='tok-'+d.agent;f.prepend(el);}
+      var tk=el.querySelector('.tk');if(tk)tk.textContent+=(d.chunk||'');break;}
+    case 'tool_exec':{tick(d.agent+'→'+d.tool+'['+d.provenance+']');push('<div class="content">🔧 <b>'+esc(d.agent)+'</b> → '+esc(d.tool)+' <span class="badge MEDIUM">'+esc(d.provenance)+'</span></div>','k-network');break;}
+    case 'agent_deployed':{push('<div class="content">🤖 <b>'+esc(d.agent)+'</b> — '+esc(d.task)+'</div>','k-agent');break;}
+    case 'agent_report':{var e2=$('tok-'+d.agent);if(e2&&e2.parentNode)e2.parentNode.removeChild(e2);
+      push('<div class="content">📄 <b>'+esc(d.agent)+'</b> '+(d.ok?'✅':'⚠️')+' '+esc(d.summary||'')+'</div>','k-receipt');break;}
+    case 'network_actuation':{push('<div class="content">⚡ <b>'+esc(d.act)+'</b> '+esc(d.msisdn||'')+' '+esc(d.profile||d.event||'')+'</div>','k-act');tick('ACT: '+d.act);
+      if(d.lat!=null&&d.lon!=null)marker(d.lat,d.lon,d.act,'#38bdf8',true);break;}
+    case 'camara_error':{push('<div class="content">⚠️ '+esc(d.api)+': '+esc(d.error)+'<span class="thought">'+esc((d.diagnostic||{}).action||'')+'</span></div>','k-err');break;}
+    case 'camara_twin':{tick('TWIN fallback: '+d.api);break;}
+    case 'trust_receipt':{push('<div class="meta"><span>🧾 RECEIPT</span><span>'+((d.receipt||{}).verified?'✅':'⚠️')+'</span></div><div class="content"><b>'+esc((d.receipt||{}).action)+'</b><div style="font-family:\'Share Tech Mono\',monospace;font-size:9px;color:var(--grn);word-break:break-all">'+esc((d.receipt||{}).ledger_hash||'')+'</div></div>','k-receipt');break;}
+    case 'grounding_violation':{push('<div class="content" style="color:var(--red)">🚫 GROUNDING VIOLATION — '+((d.violations||[]).length)+' rejected</div>','k-err');break;}
+    case 'credits':{push('<div class="content">'+(d.delta>=0?'💰':'💸')+' <b>'+esc(d.delta)+'</b> '+esc(d.currency||'')+' — '+esc(d.reason)+'</div>','k-act');break;}
+    case 'system_initialized':{push('<div class="content">🌍 <b>'+esc(d.region)+'</b> · '+esc(d.credits)+' '+esc(d.currency)+' · health '+esc(d.health)+'</div>','k-network');break;}
+    case 'blueprint_generated':{if(panel==='blue')loadBlueprints();push('<div class="content">🗺️ blueprint: <b>'+esc((d.blueprint||{}).region)+'</b> — '+esc((d.blueprint||{}).metric||'')+'</div>','k-network');break;}
+    case 'adaptive_update':{tick('adaptive: sweep='+((d.adaptive||{}).sweep_sec)+'s thr='+((d.adaptive||{}).cong_threshold));break;}
+    case 'operator_command':{push('<div class="content"><span class="badge HIGH">OPERATOR</span> '+esc(d.command)+'</div>','k-op');break;}
+    case 'task_completed':{push('<div class="content">🏁 '+esc(d.summary||'')+'<span class="thought">conf '+Math.round((d.confidence||0)*100)+'%</span></div>','k-guarantee');break;}
+    case 'structured_error':{push('<div class="content" style="color:var(--red)">⚠️ '+esc(d.component)+': '+esc(d.error)+'</div>','k-err');break;}
+    case 'detection_sweep':{tick('sweep #'+d.beat);break;}
+    default:break;
+  }
+}
+setPanel('fusion');
+</script>
+</body>
+</html>
