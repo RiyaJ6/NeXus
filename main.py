@@ -26,8 +26,6 @@ load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "") or os.getenv("GROQ_KEY", "")
 NOKIA_API_KEY = os.getenv("NOKIA_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-GROQ_MODEL_FAST = os.getenv("GROQ_MODEL_FAST", "llama-3.1-8b-instant")
 NOKIA_ENTRY = (os.getenv("NOKIA_BASE", "") or os.getenv("NOKIA_API_BASE", "") or "https://network-as-code.nokia.rapidapi.com").rstrip("/")
 TEST_MSISDN = os.getenv("NOKIA_TEST_MSISDN", "").strip()
 STATE_FILE = os.getenv("STATE_FILE", "nexus_state.json")
@@ -1275,4 +1273,4 @@ if __name__ == "__main__":
     import uvicorn
     if not GROQ_API_KEY: raise ValueError("GROQ_API_KEY required (brain).")
     if not NOKIA_API_KEY: print("WARNING: NOKIA_API_KEY missing — all network tools degrade to labeled TWIN.")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
